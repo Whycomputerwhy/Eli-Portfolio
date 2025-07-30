@@ -2,6 +2,8 @@ body {
     background-color: #f0f0f0;
     font-family: sans-serif;
     text-align: center;
+    image-rendering: pixelated;
+    transform: scale(2);
   }
   
   button {
@@ -16,4 +18,3 @@ body {
     background-color: #111;
     color: white;
 }
-  
