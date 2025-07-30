@@ -1,15 +1,24 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My First Page</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" type="image/png" href="assets/images/favicon.png">
   </head>
   <body>
-    <h1>Hello, world!</h1>
-    <p>This is my first website.</p>
-    <button onclick="sayHi()">Click me</button>
-    <button onclick="toggleDarkMode()">🌙 Toggle Dark Mode</button>
+    <div id="scaled-wrapper">
+      <div id="scaled-content">
+        <h1>Hello, world!</h1>
+        <p>This is my first website.</p>
+        <button onclick="sayHi()">Click me</button>
+        <button onclick="toggleDarkMode()">🌙 Toggle Dark Mode</button>
+        <div style="display: flex; justify-content: center; margin-top: 20px;">
+          <img src="assets/images/Group 16.png" alt="Test Image" style="max-width: 200px;">
+        </div>
+      </div>
+    </div>
     <script src="script.js"></script>
   </body>
 </html>
