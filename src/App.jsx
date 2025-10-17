@@ -8,7 +8,6 @@ export default function App() {
     <div className="min-h-screen flex flex-col">
       <Nav />
       <main className="flex-1">
-        <img src="/images/test.png" alt="Full screen" className="w-full h-screen object-cover" />
         <Hero />
       </main>
       <Footer />
