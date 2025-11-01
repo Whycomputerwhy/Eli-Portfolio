@@ -12,7 +12,10 @@
       <div class="control-group">
         <label>Upload IMDb CSV file:</label>
         <input type="file" id="csvFile" accept=".csv">
-        <button id="generateFromCsv">Generate from CSV</button>
+        <button id="generateFromCsv" class="progress-button">
+          <span class="progress-fill-bg" id="progressFillBg"></span>
+          <span class="button-text" id="buttonText">Generate from CSV</span>
+        </button>
       </div>
       
       <div class="control-group">
@@ -66,8 +69,8 @@
         return;
       }
 
-      const posterWidth = 150;
-      const posterHeight = 220;
+      const posterWidth = 300;
+      const posterHeight = 440;
       const rows = Math.ceil(posters.length / imagesPerRow);
       const canvas = document.getElementById("posterCanvas");
       canvas.width = posterWidth * imagesPerRow;
@@ -99,16 +102,26 @@
       });
     }
 
-    async function loadImagesForIds(imdbIds) {
-      const posterUrls = await Promise.all(imdbIds.map(id => fetchPosterUrl(id)));
-      const validUrls = posterUrls.filter(Boolean);
-      const posters = await Promise.all(validUrls.map(async url => {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.src = url;
-        await img.decode().catch(() => {});
-        return img;
-      }));
+    async function loadImagesForIds(imdbIds, onProgress) {
+      const total = imdbIds.length;
+      let fetched = 0;
+      const posters = [];
+
+      // Process IDs sequentially to track progress
+      for (const id of imdbIds) {
+        const url = await fetchPosterUrl(id);
+        if (url) {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.src = url;
+          await img.decode().catch(() => {});
+          posters.push(img);
+        }
+        fetched++;
+        if (onProgress) {
+          onProgress(fetched, total);
+        }
+      }
       return posters;
     }
 
@@ -127,9 +140,37 @@
       const imdbIds = rows.slice(1).map(r => (r[tconstIndex] || "").trim()).filter(Boolean);
       if (!imdbIds.length) return alert("No IMDb IDs found in CSV.");
 
-      const posters = await loadImagesForIds(imdbIds);
-      cachedPosters = posters;
-      await renderCollageFromImages(cachedPosters);
+      // Show progress in button
+      const button = document.getElementById("generateFromCsv");
+      const progressFillBg = document.getElementById("progressFillBg");
+      const buttonText = document.getElementById("buttonText");
+      
+      button.disabled = true;
+      button.classList.add("loading");
+      progressFillBg.style.width = "0%";
+      buttonText.textContent = "0 / " + imdbIds.length;
+
+      // Update progress callback
+      const updateProgress = (fetched, total) => {
+        const percentage = (fetched / total) * 100;
+        progressFillBg.style.width = percentage + "%";
+        buttonText.textContent = fetched + " / " + total;
+      };
+
+      try {
+        const posters = await loadImagesForIds(imdbIds, updateProgress);
+        cachedPosters = posters;
+        await renderCollageFromImages(cachedPosters);
+      } catch (error) {
+        console.error("Error loading posters:", error);
+        alert("An error occurred while loading posters.");
+      } finally {
+        // Reset button
+        button.disabled = false;
+        button.classList.remove("loading");
+        progressFillBg.style.width = "0%";
+        buttonText.textContent = "Generate from CSV";
+      }
     });
 
     // Live preview when images-per-row changes
