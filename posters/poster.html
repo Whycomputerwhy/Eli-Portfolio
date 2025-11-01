@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>IMDb Poster Collage</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="sidebar">
+    <h1>IMDb Poster Collage Generator</h1>
+    <div class="controls">
+      <div class="control-group">
+        <label>Upload IMDb CSV file:</label>
+        <input type="file" id="csvFile" accept=".csv">
+        <button id="generateFromCsv">Generate from CSV</button>
+      </div>
+      
+      <div class="control-group">
+        <label>Images per row:</label>
+        <input type="number" id="imagesPerRow" value="5" min="1" max="50">
+      </div>
+
+      <div class="control-group">
+        <button id="downloadImage">Download Image</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="preview-container">
+    <canvas id="posterCanvas"></canvas>
+  </div>
+
+  <script>
+    // --- Helper: fetch IMDb page and extract poster URL ---
+    async function fetchPosterUrl(imdbId) {
+      const url = `https://corsproxy.io/?https://www.imdb.com/title/${imdbId}/`;
+      try {
+        const html = await fetch(url).then(r => r.text());
+        const match = html.match(/<meta property="og:image" content="([^"]+)"/);
+        return match ? match[1] : "";
+      } catch (err) {
+        console.error("Error fetching IMDb page:", imdbId, err);
+        return "";
+      }
+    }
+
+    let cachedPosters = [];
+
+    // Initialize canvas with empty placeholder
+    function initializeEmptyCanvas() {
+      const canvas = document.getElementById("posterCanvas");
+      canvas.width = 750;
+      canvas.height = 550;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // Initialize on page load
+    initializeEmptyCanvas();
+
+    async function renderCollageFromImages(posters) {
+      const imagesPerRow = parseInt(document.getElementById("imagesPerRow").value);
+      if (!posters.length) {
+        initializeEmptyCanvas();
+        return;
+      }
+
+      const posterWidth = 150;
+      const posterHeight = 220;
+      const rows = Math.ceil(posters.length / imagesPerRow);
+      const canvas = document.getElementById("posterCanvas");
+      canvas.width = posterWidth * imagesPerRow;
+      canvas.height = posterHeight * rows;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      posters.forEach((img, i) => {
+        const cellX = (i % imagesPerRow) * posterWidth;
+        const cellY = Math.floor(i / imagesPerRow) * posterHeight;
+
+        // Scale to cover the cell (one axis may overflow), preserve aspect ratio
+        const scale = Math.max(posterWidth / img.width, posterHeight / img.height);
+        const drawW = Math.floor(img.width * scale);
+        const drawH = Math.floor(img.height * scale);
+
+        // Center inside the cell
+        const dx = cellX + Math.floor((posterWidth - drawW) / 2);
+        const dy = cellY + Math.floor((posterHeight - drawH) / 2);
+
+        // Clip drawing to the cell so overflow never draws outside 150x220
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(cellX, cellY, posterWidth, posterHeight);
+        ctx.clip();
+        ctx.drawImage(img, dx, dy, drawW, drawH);
+        ctx.restore();
+      });
+    }
+
+    async function loadImagesForIds(imdbIds) {
+      const posterUrls = await Promise.all(imdbIds.map(id => fetchPosterUrl(id)));
+      const validUrls = posterUrls.filter(Boolean);
+      const posters = await Promise.all(validUrls.map(async url => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = url;
+        await img.decode().catch(() => {});
+        return img;
+      }));
+      return posters;
+    }
+
+    // Generate directly from CSV (no JSON step)
+    document.getElementById("generateFromCsv").addEventListener("click", async () => {
+      const file = document.getElementById("csvFile").files[0];
+      if (!file) return alert("Please upload an IMDb CSV file first.");
+      const text = await file.text();
+      const rows = text.split("\n").map(r => r.split(","));
+      const header = rows[0];
+      const tconstIndex = header.indexOf("Const");
+      if (tconstIndex === -1) {
+        alert("Could not find IMDb Const column in CSV.");
+        return;
+      }
+      const imdbIds = rows.slice(1).map(r => (r[tconstIndex] || "").trim()).filter(Boolean);
+      if (!imdbIds.length) return alert("No IMDb IDs found in CSV.");
+
+      const posters = await loadImagesForIds(imdbIds);
+      cachedPosters = posters;
+      await renderCollageFromImages(cachedPosters);
+    });
+
+    // Live preview when images-per-row changes
+    document.getElementById("imagesPerRow").addEventListener("change", async () => {
+      if (!cachedPosters.length) return;
+      await renderCollageFromImages(cachedPosters);
+    });
+
+    document.getElementById("downloadImage").addEventListener("click", () => {
+      const link = document.createElement("a");
+      link.download = "poster_collage.png";
+      link.href = document.getElementById("posterCanvas").toDataURL("image/png");
+      link.click();
+    });
+  </script>
+</body>
+</html>
